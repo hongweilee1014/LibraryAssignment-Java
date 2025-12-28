@@ -1,5 +1,5 @@
 # --- Stage 1: Build the Application ---
-FROM maven:3.9.12-openjdk-17 AS build
+FROM maven:3.8.5-openjdk-17 AS build
 WORKDIR /app
 
 # Copy the project files

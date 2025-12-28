@@ -1,191 +1,132 @@
-```markdown
 # Library Management API (Java Edition)
 
-A RESTful API built with **Java 17** and **Spring Boot** to manage a simple library system. This solution implements a clean architecture pattern (Controller-Service-Repository), automated logging via SLF4J, and comprehensive unit testing.
+A RESTful API built with **Java 17** and **Spring Boot** to manage a library system. This solution implements a Clean Architecture pattern, utilizes **Docker** for containerized deployment, and is designed to adhere to **12-Factor App** principles.
 
-## Table of Contents
-1. [Getting Started](#getting-started)
-2. [API Endpoints](#api-endpoints)
-3. [12 Factor App Conformance](#12-factor-app-conformance)
-4. [Data Models & Assumptions](#data-models--assumptions)
-5. [Tech Stack](#tech-stack)
+## 🚀 Live Demo
+* **Base URL:** `https://libraryassignment-java.onrender.com/`
+* **Swagger Documentation:** `https://libraryassignment-java.onrender.com/swagger-ui.html`
+* *Note: The application is hosted on a free tier instance. Please allow up to 1 minute for the initial request to wake up the server.*
 
 ---
 
-## Getting Started
+## 🛡️ 12-Factor App Conformance
+This application was built following the [12-Factor App methodology](https://12factor.net/) to ensure portability and resilience.
+
+| Factor | Principle | Implementation in this Project |
+| :--- | :--- | :--- |
+| **I. Codebase** | One codebase, many deploys. | A single Git repository tracks the application. The same code is deployed to all environments (dev, test, production). |
+| **II. Dependencies** | Explicitly declare dependencies. | All dependencies are explicitly declared in `pom.xml` (Maven). No implicit reliance on system-wide libraries. |
+| **III. Config** | Store config in the environment. | Configuration is separated from code. Default values are in `application.properties`, but can be overridden via Environment Variables (e.g., `SERVER_PORT`, `DB_URL`) at runtime. |
+| **IV. Backing Services** | Treat backing services as attached resources. | The database access is abstracted via **Spring Data JPA**. Switching from H2 (In-Memory) to MySQL or PostgreSQL only requires changing the connection string config, not the code. |
+| **V. Build, Release, Run** | Strictly separate stages. | The deployment pipeline is separated: **Build** (Maven creates the JAR), **Release** (Docker images are tagged), and **Run** (Container execution). |
+| **VI. Processes** | Execute the app as stateless processes. | The core application is stateless. Any persistence is delegated to the database (Backing Service), allowing horizontal scaling of the API service. |
+| **XI. Logs** | Treat logs as event streams. | Logging is handled via **SLF4J**. Logs are written to `stdout` (console), allowing the execution environment (Docker/Cloud) to capture, aggregate, and archive them without app-level file management. |
+
+---
+
+## 🛠 Tech Stack
+* **Language:** Java 17
+* **Framework:** Spring Boot 3.x
+* **Database:** H2 In-Memory Database
+* **Logging:** SLF4J (Structured Logging)
+* **Containerization:** Docker (Multi-stage build)
+* **Testing:** JUnit 5 + Mockito
+
+---
+
+## ⚙️ Getting Started
 
 ### Prerequisites
 * [Java 17 SDK](https://adoptium.net/temurin/releases/)
-* [Maven](https://maven.apache.org/)
-* Docker (Optional, for containerization)
+* [Maven](https://maven.apache.org/) (or use the included wrapper `./mvnw`)
+* [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Optional)
 
-### Running the Application Locally
+### Option 1: Run Locally (Java)
 1.  **Navigate to the project folder:**
     ```bash
     cd LibraryAssignment
     ```
 
-2.  **Build the project:**
+2.  **Run the application:**
     ```bash
-    mvn clean install
+    # Using the Maven Wrapper (Recommended - No installation required)
+    ./mvnw spring-boot:run
     ```
 
-3.  **Run the application:**
+3.  **Access the API:**
+    * API Root: `http://localhost:8080`
+    * Swagger UI: `http://localhost:8080/swagger-ui.html`
+
+### Option 2: Run with Docker (Recommended)
+This ensures the application runs in the exact environment intended for production.
+
+1.  **Build the Image:**
     ```bash
-    mvn spring-boot:run
+    docker build -t library-api .
     ```
 
-4.  **Access the API:**
-    * The API will start at `http://localhost:8080`.
-    * **Swagger UI:** Navigate to `http://localhost:8080/swagger-ui.html` to test endpoints interactively.
+2.  **Run the Container:**
+    ```bash
+    docker run -p 8080:8080 library-api
+    ```
 
-### Running Unit Tests
-To run the JUnit 5 test suite:
+---
+
+## 🧪 Running Tests
+The solution includes a comprehensive unit test suite covering business logic and validation rules.
+
+To execute tests:
 ```bash
-mvn test
-
-```
-
-### Running with Docker
-
-```bash
-docker build -t library-api-java .
-docker run -p 8080:8080 library-api-java
+./mvnw test
 
 ```
 
 ---
 
-## API Endpoints
+## 📡 API Endpoints
 
 ### 1. Register a Borrower
 
-Registers a new user in the system.
-
-* **URL:** `POST /api/library/borrowers`
-* **Body:**
-```json
-{
-  "name": "Wei Lee",
-  "email": "weilee@example.com"
-}
-
-```
-
-
-* **Response (201 Created):** Returns the created borrower object with `id`.
-* **Error (400 Bad Request):** If the email is already registered.
+* **POST** `/api/library/borrowers`
+* **Body:** `{"name": "Wei Lee", "email": "wei@example.com"}`
+* *Business Rule:* Emails must be unique.
 
 ### 2. Register a Book
 
-Registers a new physical book copy.
+* **POST** `/api/library/books`
+* **Body:** `{"isbn": "978-3-16-148410-0", "title": "Clean Code", "author": "Robert C. Martin"}`
+* *Business Rule:* Multiple copies (IDs) can share an ISBN, but they must match the existing Title/Author metadata.
 
-* **URL:** `POST /api/library/books`
-* **Body:**
-```json
-{
-  "isbn": "978-3-16-148410-0",
-  "title": "Clean Code",
-  "author": "Robert C. Martin"
-}
+### 3. Borrow a Book
+
+* **POST** `/api/library/borrow?borrowerId=1&bookId=5`
+* *Business Rule:* A specific book copy cannot be borrowed if it is already checked out.
+
+### 4. Return a Book
+
+* **POST** `/api/library/return/{bookId}`
+
+### 5. List All Books
+
+* **GET** `/api/library/books`
+
+---
+
+## 📂 Project Structure
+
+```text
+src/
+├── main/
+│   ├── java/com/example/library/
+│   │   ├── controller/    # API Layer (REST Endpoints)
+│   │   ├── service/       # Business Logic Layer
+│   │   ├── repository/    # Data Access Layer (JPA)
+│   │   └── model/         # Domain Entities
+│   └── resources/
+│       └── application.properties # Configuration
+└── test/                  # JUnit 5 Tests
 
 ```
-
-
-* **Response (201 Created):** Returns the created book with a unique `id`.
-* **Error (400 Bad Request):** If the ISBN exists but the Title/Author does not match (per validation rules).
-
-### 3. Get All Books
-
-Retrieves a list of all books in the library.
-
-* **URL:** `GET /api/library/books`
-* **Response (200 OK):**
-```json
-[
-  {
-    "id": 1,
-    "isbn": "978-3-16-148410-0",
-    "title": "Clean Code",
-    "author": "Robert C. Martin",
-    "currentBorrowerId": null
-  }
-]
-
-```
-
-
-
-### 4. Borrow a Book
-
-Allows a registered borrower to borrow a specific book copy.
-
-* **URL:** `POST /api/library/borrow`
-* **Query Parameters:**
-* `borrowerId` (int): The ID of the borrower.
-* `bookId` (int): The unique ID of the book copy.
-
-
-* **Example:** `/api/library/borrow?borrowerId=1&bookId=5`
-* **Response (200 OK):** "Book borrowed successfully."
-* **Error (409 Conflict):** If the book is already borrowed by someone else.
-
-### 5. Return a Book
-
-Returns a borrowed book to the library.
-
-* **URL:** `POST /api/library/return/{bookId}`
-* **Example:** `/api/library/return/5`
-* **Response (200 OK):** "Book returned."
-* **Error (404 Not Found):** If the book ID does not exist.
-
----
-
-## 12 Factor App Conformance
-
-This application follows the [12-Factor App methodology](https://12factor.net/) to ensure scalability and maintainability.
-
-| Factor | Principle | Implementation in this Project |
-| --- | --- | --- |
-| **I. Codebase** | One codebase, many deploys. | Single Git repository containing the API and Tests. |
-| **II. Dependencies** | Explicitly declare dependencies. | Managed via **Maven** (`pom.xml`). No implicit system-wide packages. |
-| **III. Config** | Store config in the environment. | Configuration is managed via `application.properties` and can be overridden by Environment Variables. |
-| **IV. Backing Services** | Treat backing services as attached resources. | Database is accessed via **Spring Data JPA**; swapping H2 for MySQL/PostgreSQL is a config change only. |
-| **V. Build, Release, Run** | Strictly separate stages. | **Dockerfile** uses multi-stage builds (Maven for build, OpenJDK for execution). |
-| **XI. Logs** | Treat logs as event streams. | **SLF4J** writes to Console (stdout) for container aggregation. |
-
----
-
-## Data Models & Assumptions
-
-### Assumptions
-
-1. **Book ID vs. ISBN:**
-* **ISBN** represents the *intellectual work* (metadata).
-* **ID** represents the *physical copy*.
-* *Constraint:* The system allows multiple physical copies (different IDs) to share the same ISBN. However, if a new book uses an existing ISBN, its Title and Author MUST match the existing record.
-
-
-2. **Borrowing Limits:**
-* A book copy (Unique ID) can only be borrowed by one person at a time.
-* There is currently no limit on *how many* books a single borrower can hold simultaneously (unless specified otherwise).
-
-
-3. **Database:**
-* **H2 Database (In-Memory)** was chosen for this implementation to ensure the application is self-contained and requires no external setup for the reviewer.
-
-
-
----
-
-## Tech Stack
-
-* **Language:** Java 17
-* **Framework:** Spring Boot 3.x
-* **Database:** H2 Database (Spring Data JPA)
-* **Logging:** SLF4J
-* **Documentation:** Swagger / OpenAPI
-* **Testing:** JUnit 5 + Mockito
 
 ```
 
