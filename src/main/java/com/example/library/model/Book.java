@@ -3,6 +3,7 @@ package com.example.library.model;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 @Entity
 @Data
