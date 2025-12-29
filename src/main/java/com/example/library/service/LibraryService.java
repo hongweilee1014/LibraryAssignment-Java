@@ -23,44 +23,80 @@ public class LibraryService {
     }
 
     @Transactional
-    public Borrower registerBorrower(Borrower borrower) {
-        log.info("Request: Registering Borrower with email {}", borrower.getEmail());
-
-        try {
-            if (borrowerRepository.existsByEmail(borrower.getEmail())) {
+    public Borrower registerBorrower(Borrower request) {
+        log.info("Attempting to register borrower: {}", request.getEmail());
+		
+		   // 1. Application-level check (Friendly error)
+           if (borrowerRepository.existsByEmail(request.getEmail())) {
+                log.warn("Registration rejected. Email '{}' already exists.", request.getEmail());
                 throw new IllegalStateException("Email already registered.");
             }
-            Borrower savedBorrower = borrowerRepository.save(borrower);
-            
-            log.info("Response: Successfully registered Borrower ID {}", savedBorrower.getId());
-            return savedBorrower;
 
-        } catch (Exception ex) {
-            log.error("Exception: Failed to register borrower {}. Error: {}", borrower.getEmail(), ex.getMessage());
-            throw ex; // Re-throw so Controller handles the HTTP status
+        try {
+         
+
+            // 2. Database interaction
+            Borrower saved = borrowerRepository.save(request);
+            log.info("Borrower registered successfully. ID: {}", saved.getId());
+            return saved;
+
+        } catch (IllegalArgumentException e) {
+            // Pass through our specific business validation errors
+            throw e; 
+            
+        } catch (Exception e) {
+            // 3. Catch unexpected errors (Database down, Network issues, etc.)
+            log.error("Unexpected error while registering borrower: {}", e.getMessage(), e);
+            throw new RuntimeException("System error: Unable to register borrower. Please try again later.");
         }
     }
 
     @Transactional
-    public Book registerBook(Book book) {
-        log.info("Request: Registering Book ISBN {}", book.getIsbn());
+   public Book registerBook(Book request) {
+        log.info("Registering book ISBN: {}", request.getIsbn());
+		   // 1. Check existing copies for consistency
+            List<Book> existingCopies = bookRepository.findByIsbn(request.getIsbn());
 
-        try {
-            // Rule: If ISBN exists, Title/Author must match
-            bookRepository.findFirstByIsbn(book.getIsbn()).ifPresent(existing -> {
-                if (!existing.getTitle().equals(book.getTitle()) || 
-                    !existing.getAuthor().equals(book.getAuthor())) {
+            if (!existingCopies.isEmpty()) {
+                Book originalMetadata = existingCopies.get(0);
+
+                // Rule: "2 books with the same ISBN numbers must have the same title and same author"
+                boolean titleMatch = originalMetadata.getTitle().equalsIgnoreCase(request.getTitle());
+                boolean authorMatch = originalMetadata.getAuthor().equalsIgnoreCase(request.getAuthor());
+
+                if (!titleMatch || !authorMatch) {
+                    log.warn("ISBN Conflict! Input: '{}' by '{}'. Existing: '{}' by '{}'", 
+                              request.getTitle(), request.getAuthor(), 
+                              originalMetadata.getTitle(), originalMetadata.getAuthor());
+                    
                     throw new IllegalStateException("ISBN conflict: Metadata mismatch.");
                 }
-            });
+                log.info("ISBN matches existing records. Adding a new physical copy.");
+            } else {
+                log.info("New ISBN detected. Creating first copy.");
+            }
 
-            Book savedBook = bookRepository.save(book);
-            log.info("Response: Successfully registered Book ID {}", savedBook.getId());
+        try {
+         
+
+            // 2. Create and Save the new physical copy
+            Book newCopy = new Book();
+            newCopy.setIsbn(request.getIsbn());
+            newCopy.setTitle(request.getTitle());
+            newCopy.setAuthor(request.getAuthor());
+            
+            Book savedBook = bookRepository.save(newCopy);
+            log.info("Book saved successfully. New ID: {}", savedBook.getId());
             return savedBook;
 
-        } catch (Exception ex) {
-            log.error("Exception: Failed to register book {}. Error: {}", book.getTitle(), ex.getMessage());
-            throw ex;
+        } catch (IllegalArgumentException e) {
+            // SPECIFIC CATCH: Business rule failed. Re-throw so Controller sends 400 Bad Request.
+            throw e;
+
+        } catch (Exception e) {
+            // GENERAL CATCH: Database or System failure. Log it and throw generic error.
+            log.error("Unexpected error while registering book ISBN {}: {}", request.getIsbn(), e.getMessage(), e);
+            throw new RuntimeException("System error: Unable to register book. Please try again later.");
         }
     }
 
