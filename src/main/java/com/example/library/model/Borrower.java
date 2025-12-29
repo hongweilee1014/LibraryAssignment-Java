@@ -10,6 +10,7 @@ import lombok.Data;
 public class Borrower {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+	@Schema(accessMode = Schema.AccessMode.READ_ONLY)
     private Long id;
 
     @NotBlank(message = "Name is required")
